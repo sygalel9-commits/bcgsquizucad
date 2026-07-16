@@ -1,8 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
-const SECRET = "bcgs_quiz_secret_2024";
+const SECRET = process.env.SECRET_JWT || "bcgs_quiz_secret_2024";
 const app = express();
 const port = 3000;
 
@@ -7826,6 +7827,6 @@ app.post('/api/classement/visibilite', (req, res) => {
     res.status(401).json({ erreur: "Non autorise" });
   }
 });
-app.listen(port, '0.0.0.0', () => {
+app.listen(process.env.PORT || port, () => {
   console.log("Serveur demarre sur http://localhost:" + port);
 });
