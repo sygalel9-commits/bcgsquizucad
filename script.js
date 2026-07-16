@@ -72,7 +72,7 @@ function afficherLanding() {
 
       <div style="display:flex; gap:14px; flex-wrap:wrap; justify-content:center; margin-bottom:64px;">
         <button class="btn-ocre" onclick="afficherInscription()" style="padding:16px 36px; font-size:1rem;">
-          Créer un compte 
+          Créer un compte gratuit
         </button>
         <button class="btn-contour" onclick="afficherConnexion()" style="padding:16px 36px; font-size:1rem;">
           Se connecter
@@ -97,6 +97,10 @@ function afficherLanding() {
         </div>
       </div>
 
+      <div style="margin-top:48px; font-family:'JetBrains Mono', monospace; font-size:0.72rem; color:rgba(242,237,228,0.3);">
+        5 questions gratuites · Abonnement 500 FCFA/mois · PDF à 200 FCFA
+      </div>
+
     </div>
   `;
 }
@@ -107,10 +111,10 @@ function afficherInscription() {
     <div style="min-height:80vh; display:flex; align-items:center; justify-content:center; padding:40px 24px;">
       <div style="background:var(--fond-carte); border:1px solid var(--ligne); border-radius:4px; padding:40px; width:100%; max-width:420px;">
 
-        <div class="lien-retour" onclick="afficherLanding()" style="margin-bottom:24px;"> Retour</div>
+        <div class="lien-retour" onclick="afficherLanding()" style="margin-bottom:24px;">← Retour</div>
 
         <div style="font-family:'Fraunces', serif; font-size:1.8rem; font-weight:700; margin-bottom:6px;">Créer un compte</div>
-
+        <div style="color:rgba(242,237,228,0.5); font-size:0.88rem; margin-bottom:32px;">5 questions gratuites pour commencer</div>
 
         <div id="erreur-inscription" style="display:none; background:rgba(224,101,79,0.15); border:1px solid var(--terracotta); border-radius:4px; padding:12px; margin-bottom:20px; font-size:0.88rem; color:var(--terracotta);"></div>
 
@@ -130,7 +134,7 @@ function afficherInscription() {
         </div>
 
         <button class="btn-ocre" onclick="inscrire()" style="width:100%; padding:16px; font-size:1rem;">
-          Valider l'inscription
+          Créer mon compte →
         </button>
 
         <div style="text-align:center; margin-top:20px; font-size:0.85rem; color:rgba(242,237,228,0.5);">
@@ -166,7 +170,7 @@ function afficherConnexion() {
         </div>
 
         <button class="btn-ocre" onclick="connecter()" style="width:100%; padding:16px; font-size:1rem;">
-          Se connecter
+          Se connecter →
         </button>
 
         <div style="text-align:center; margin-top:20px; font-size:0.85rem; color:rgba(242,237,228,0.5);">
@@ -288,7 +292,8 @@ function genererHeader() {
           ${utilisateurConnecte.aPaye ? '✓ Abonné' : `${MAX_QUESTIONS_GRATUITES - questionsJouees} questions gratuites restantes`}
         </div>
       </div>
-      <button onclick="deconnecter()" style="font-family:'JetBrains Mono', monospace; font-size:0.68rem; background:transparent; border:1px solid var(--ligne); color:rgba(242,237,228,0.5); padding:8px 14px; border-radius:4px; cursor:pointer; text-transform:uppercase; letter-spacing:0.04em;">Deconnexion
+      <button onclick="deconnecter()" style="font-family:'JetBrains Mono', monospace; font-size:0.68rem; background:transparent; border:1px solid var(--ligne); color:rgba(242,237,228,0.5); padding:8px 14px; border-radius:4px; cursor:pointer; text-transform:uppercase; letter-spacing:0.04em;">
+        Déconnexion
       </button>
     </div>
   `;
@@ -299,41 +304,11 @@ async function afficherPageAccueil(semestre) {
   if (semestre) semestreActuel = semestre;
   appEl.innerHTML = "<p>Chargement...</p>";
 
-  const [reponse, reponseMeilleur] = await Promise.all([
-    fetch('/api/matieres/' + encodeURIComponent(semestreActuel)),
-    fetch('/api/meilleur')
-  ]);
-
+  const reponse = await fetch('/api/matieres/' + encodeURIComponent(semestreActuel));
   const matieres = await reponse.json();
-  const meilleur = await reponseMeilleur.json();
   window.matieresActuelles = matieres;
 
   let html = genererHeader();
-
-  // Bandeau meilleur joueur
-  if (meilleur && meilleur.afficherClassement) {
-    html += `
-      <div style="background:linear-gradient(135deg, rgba(212,165,116,0.15), rgba(95,168,143,0.1)); border:1px solid rgba(212,165,116,0.3); border-radius:4px; padding:16px 22px; margin-bottom:32px; display:flex; align-items:center; gap:16px;">
-        <div style="font-size:1.8rem;">🏆</div>
-        <div>
-          <div style="font-family:'JetBrains Mono', monospace; font-size:0.65rem; color:var(--ocre); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">Meilleur joueur du moment</div>
-          <div style="font-family:'Fraunces', serif; font-size:1.1rem; font-weight:600;">${meilleur.nom} <span style="color:var(--ocre);">${meilleur.moyenne}/20</span></div>
-          <div style="font-size:0.78rem; color:rgba(242,237,228,0.45); margin-top:2px;">${meilleur.nombreQuiz} quiz completés</div>
-        </div>
-        <button onclick="afficherClassement()" style="margin-left:auto; font-family:'JetBrains Mono', monospace; font-size:0.68rem; background:transparent; border:1px solid var(--ligne); color:rgba(242,237,228,0.6); padding:8px 14px; border-radius:4px; cursor:pointer; text-transform:uppercase; white-space:nowrap;">
-          Voir classement
-        </button>
-      </div>
-    `;
-  } else {
-    html += `
-      <div style="margin-bottom:32px;">
-        <button onclick="afficherClassement()" style="font-family:'JetBrains Mono', monospace; font-size:0.68rem; background:transparent; border:1px solid var(--ligne); color:rgba(242,237,228,0.6); padding:10px 18px; border-radius:4px; cursor:pointer; text-transform:uppercase; letter-spacing:0.04em;">
-          🏆 Voir le classement
-        </button>
-      </div>
-    `;
-  }
 
   html += `
     <h1 class="hero-titre">Révise tes cours comme <em>un vrai cahier de labo.</em></h1>
@@ -378,90 +353,7 @@ async function afficherPageAccueil(semestre) {
   html += `</div>`;
   appEl.innerHTML = html;
 }
-async function afficherClassement() {
-  appEl.innerHTML = "<p>Chargement...</p>";
 
-  const reponse = await fetch('/api/classement');
-  const classement = await reponse.json();
-
-  // Verifier si l'utilisateur connecte est dans le classement
-  const monRang = classement.findIndex(j => j.id === utilisateurConnecte.id);
-
-  let html = `
-    ${genererHeader()}
-    <div class="lien-retour" onclick="afficherPageAccueil()">← Retour</div>
-
-    <h2 class="hero-titre" style="font-size:2rem; margin-bottom:6px;">🏆 Classement </h2>
-    <p class="hero-sous" style="margin-bottom:32px;">Les meilleurs joueurs</p>
-  `;
-
-  if (classement.length === 0) {
-    html += `<p style="color:rgba(242,237,228,0.5);">Aucun joueur classé pour l'instant. Joue des quiz pour apparaître ici !</p>`;
-  } else {
-    html += `<div style="max-width:600px;">`;
-
-    classement.forEach((joueur, index) => {
-      const estMoi = joueur.id === utilisateurConnecte.id;
-      const medals = ['🥇', '🥈', '🥉'];
-      const medal = medals[index] || `${index + 1}.`;
-
-      html += `
-        <div style="background:${estMoi ? 'rgba(212,165,116,0.12)' : 'var(--fond-carte)'}; border:1px solid ${estMoi ? 'var(--ocre)' : 'var(--ligne)'}; border-radius:4px; padding:16px 20px; margin-bottom:10px; display:flex; align-items:center; gap:16px;">
-          <div style="font-size:1.4rem; width:32px; text-align:center;">${medal}</div>
-          <div style="flex:1;">
-            <div style="font-family:'Fraunces', serif; font-size:1rem; font-weight:600;">
-              ${joueur.nom} ${estMoi ? '<span style="font-family:Inter; font-size:0.72rem; color:var(--ocre);">(toi)</span>' : ''}
-            </div>
-            <div style="font-size:0.78rem; color:rgba(242,237,228,0.45); margin-top:2px;">${joueur.nombreQuiz} quiz complétés</div>
-          </div>
-          <div style="font-family:'JetBrains Mono', monospace; font-weight:700; color:var(--ocre); font-size:1.1rem;">
-            ${joueur.moyenne}/20
-          </div>
-        </div>
-      `;
-    });
-
-    html += `</div>`;
-
-    // Option visibilite pour le meilleur joueur
-    if (monRang === 0) {
-      const visible = true;
-      html += `
-        <div style="margin-top:28px; background:var(--fond-carte); border:1px solid var(--ligne); border-radius:4px; padding:20px 24px; max-width:600px;">
-          <div style="font-family:'Fraunces', serif; font-size:1rem; font-weight:600; margin-bottom:8px;">Tu es le meilleur joueur 🎉</div>
-          <div style="font-size:0.85rem; color:rgba(242,237,228,0.6); margin-bottom:16px;">Veux-tu que ton nom apparaisse sur la page d'accueil pour tous les utilisateurs ?</div>
-          <div style="display:flex; gap:10px;">
-            <button class="btn-ocre" onclick="changerVisibilite(true)" style="padding:10px 20px; font-size:0.85rem;">✓ Oui, afficher mon nom</button>
-            <button class="btn-contour" onclick="changerVisibilite(false)" style="padding:10px 20px; font-size:0.85rem;">Non, rester discret</button>
-          </div>
-        </div>
-      `;
-    }
-  }
-
-  appEl.innerHTML = html;
-}
-
-async function changerVisibilite(afficher) {
-  await fetch('/api/classement/visibilite', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: utilisateurConnecte.token, afficher })
-  });
-
-  const message = afficher
-    ? "Ton nom apparaîtra sur la page d'accueil !"
-    : "Tu resteras discret dans le classement.";
-
-  appEl.innerHTML = `
-    ${genererHeader()}
-    <div style="text-align:center; padding:60px 24px;">
-      <div style="font-size:2rem; margin-bottom:16px;">${afficher ? '🌟' : '👌'}</div>
-      <div style="font-family:'Fraunces', serif; font-size:1.4rem; font-weight:600; margin-bottom:12px;">${message}</div>
-      <button class="btn-ocre" onclick="afficherPageAccueil()" style="margin-top:20px;">Retour à l'accueil</button>
-    </div>
-  `;
-}
 // ========== PAGE PAIEMENT WAVE ==========
 function afficherPaiement() {
   appEl.innerHTML = `
@@ -476,18 +368,23 @@ function afficherPaiement() {
 
         <div style="background:var(--fond); border:1px solid var(--ligne); border-radius:4px; padding:20px; margin-bottom:28px;">
           <div style="font-family:'JetBrains Mono', monospace; font-size:2.2rem; font-weight:700; color:var(--ocre);">500 FCFA</div>
-          <div style="font-size:0.82rem; color:rgba(242,237,228,0.4); margin-top:4px;">par mois</div>
+          <div style="font-size:0.82rem; color:rgba(242,237,228,0.4); margin-top:4px;">par mois · Sans engagement</div>
         </div>
 
         <div style="text-align:left; margin-bottom:28px;">
           <div style="font-size:0.88rem; color:rgba(242,237,228,0.7); margin-bottom:10px;">✓ Quiz illimités sur toutes les matières</div>
           <div style="font-size:0.88rem; color:rgba(242,237,228,0.7); margin-bottom:10px;">✓ Explications détaillées à chaque question</div>
           <div style="font-size:0.88rem; color:rgba(242,237,228,0.7); margin-bottom:10px;">✓ Suivi de tes scores et progressions</div>
+          <div style="font-size:0.88rem; color:rgba(242,237,228,0.4);">✗ Téléchargement PDF (200 FCFA/PDF)</div>
         </div>
 
         <button class="btn-ocre" style="width:100%; padding:16px; font-size:1rem;">
-          Payer 500 FCFA via Wave 
+          Payer 500 FCFA via Wave →
         </button>
+
+        <div style="margin-top:16px; font-size:0.78rem; color:rgba(242,237,228,0.3);">
+          Paiement sécurisé via Wave Money
+        </div>
 
       </div>
     </div>
@@ -519,8 +416,11 @@ async function afficherMatiere(nomMatiere) {
     <div class="bloc-resume">
       <div>
         <div style="font-family:'JetBrains Mono', monospace; font-size:0.68rem; color:var(--ocre); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px;">Resume du cours</div>
-        <div style="font-family:'Fraunces', serif; font-size:1.2rem; font-weight:600;">Le resume complet du cours du professeur</div>
+        <div style="font-family:'Fraunces', serif; font-size:1.2rem; font-weight:600;">Le cours complet en PDF</div>
+        <div style="font-size:0.82rem; color:rgba(242,237,228,0.4); margin-top:4px;">200 FCFA par téléchargement</div>
       </div>
+      <button class="btn-ocre" onclick="afficherPaiementPDF('${nomMatiere}')">↓ Télécharger · 200F</button>
+    </div>
 
     <div style="font-family:'JetBrains Mono', monospace; font-size:0.72rem; color:rgba(242,237,228,0.45); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:18px;">Chapitres</div>
 
@@ -716,16 +616,16 @@ function afficherPaiementPDF(nomMatiere) {
         <div class="lien-retour" onclick="afficherMatiere('${nomMatiere}')" style="text-align:left; margin-bottom:24px;">← Retour</div>
 
         <div style="font-size:2rem; margin-bottom:16px;">📄</div>
-        <div style="font-family:'Fraunces', serif; font-size:1.5rem; font-weight:700; margin-bottom:8px;">Télécharger le Resume</div>
+        <div style="font-family:'Fraunces', serif; font-size:1.5rem; font-weight:700; margin-bottom:8px;">Télécharger le PDF</div>
         <div style="color:rgba(242,237,228,0.5); font-size:0.88rem; margin-bottom:28px;">${nomMatiere}</div>
 
         <div style="background:var(--fond); border:1px solid var(--ligne); border-radius:4px; padding:20px; margin-bottom:28px;">
-          <div style="font-family:'JetBrains Mono', monospace; font-size:2rem; font-weight:700; color:var(--ocre);">100 FCFA</div>
+          <div style="font-family:'JetBrains Mono', monospace; font-size:2rem; font-weight:700; color:var(--ocre);">200 FCFA</div>
           <div style="font-size:0.82rem; color:rgba(242,237,228,0.4); margin-top:4px;">Accès permanent à ce cours</div>
         </div>
 
         <button class="btn-ocre" style="width:100%; padding:16px; font-size:1rem;">
-          Payer 100 FCFA via Wave 
+          Payer 200 FCFA via Wave →
         </button>
 
       </div>
