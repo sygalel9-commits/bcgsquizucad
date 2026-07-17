@@ -12,7 +12,7 @@ async function initialiserDB() {
       nom TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
         mot_de_passe TEXT NOT NULL,
-      aPaye INTEGER DEFAULT 0,
+      a_paye BOOLEAN DEFAULT false,
         afficher_classement INTEGER DEFAULT 1,
         date_inscription TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );

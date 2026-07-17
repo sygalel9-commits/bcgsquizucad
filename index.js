@@ -7791,7 +7791,7 @@ app.post('/api/connexion',
     }
 
   const token = jwt.sign(
-    { id: utilisateur.id, nom: utilisateur.nom, aPaye: utilisateur.aPaye },
+    { id: utilisateur.id, nom: utilisateur.nom, aPaye: utilisateur.a_paye },
     SECRET,
     { expiresIn: '7d' }
   );
@@ -7800,7 +7800,7 @@ app.post('/api/connexion',
     message: "Connexion reussie",
     token,
     nom: utilisateur.nom,
-    aPaye: utilisateur.aPaye
+    aPaye: utilisateur.a_paye
   });
 });
 
