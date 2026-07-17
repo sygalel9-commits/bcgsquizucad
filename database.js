@@ -32,6 +32,10 @@ async function initialiserDB() {
   console.log("Base de donnees PostgreSQL initialisee");
 }
 
-initialiserDB();
+if (process.env.DATABASE_URL) {
+  initialiserDB();
+} else {
+  console.warn('DATABASE_URL non défini — initialisation de la base sautée. Configurez DATABASE_URL en production.');
+}
 
 module.exports = pool;
