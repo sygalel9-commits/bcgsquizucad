@@ -22,6 +22,8 @@ BEGIN
     EXECUTE 'ALTER TABLE utilisateurs ALTER COLUMN a_paye DROP DEFAULT';
     EXECUTE 'ALTER TABLE utilisateurs ALTER COLUMN a_paye TYPE boolean USING (a_paye = 1)';
     EXECUTE 'ALTER TABLE utilisateurs ALTER COLUMN a_paye SET DEFAULT false';
+    -- ensure NOT NULL
+    EXECUTE 'ALTER TABLE utilisateurs ALTER COLUMN a_paye SET NOT NULL';
   END IF;
 END$$;`);
     console.log(' - conversion en boolean effectuée si nécessaire');

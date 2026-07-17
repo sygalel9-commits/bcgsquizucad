@@ -29,6 +29,13 @@ const couleurs = {
 let nomMatiereActuelle = "";
 let nomChapitreActuel = "";
 
+function normalizeBool(v) {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v === 1;
+  if (typeof v === 'string') return v === '1' || v.toLowerCase() === 'true';
+  return false;
+}
+
 // ========== VERIFIER TOKEN AU DEMARRAGE ==========
 function init() {
   const token = localStorage.getItem('token');
@@ -39,7 +46,7 @@ function init() {
         token,
         nom: payload.nom,
         id: payload.id,
-        aPaye: payload.aPaye
+        aPaye: normalizeBool(payload.aPaye)
       };
       questionsJouees = parseInt(localStorage.getItem('questionsJouees') || '0');
       afficherPageAccueil();
@@ -264,7 +271,7 @@ async function connecterAvec(email, mdp, erreurEl) {
   utilisateurConnecte = {
     token: data.token,
     nom: data.nom,
-    aPaye: data.aPaye
+    aPaye: normalizeBool(data.aPaye)
   };
   questionsJouees = 0;
 
