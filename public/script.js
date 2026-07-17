@@ -296,7 +296,7 @@ function genererHeader() {
           Bonjour, <span style="color:var(--ocre);">${utilisateurConnecte.nom}</span> 👋
         </div>
         <div style="font-family:'JetBrains Mono', monospace; font-size:0.65rem; color:${utilisateurConnecte.aPaye ? 'var(--sauge)' : 'rgba(242,237,228,0.4)'}; margin-top:4px;">
-          ${utilisateurConnecte.aPaye ? '✓ Abonné' : `${MAX_QUESTIONS_GRATUITES - questionsJouees} questions gratuites restantes`}
+          ${utilisateurConnecte.aPaye ? '✓ Abonné · Accès illimité' : `${MAX_QUESTIONS_GRATUITES - questionsJouees} questions gratuites restantes`}
         </div>
       </div>
       <button onclick="deconnecter()" style="font-family:'JetBrains Mono', monospace; font-size:0.68rem; background:transparent; border:1px solid var(--ligne); color:rgba(242,237,228,0.5); padding:8px 14px; border-radius:4px; cursor:pointer; text-transform:uppercase; letter-spacing:0.04em;">
@@ -334,7 +334,7 @@ async function afficherPageAccueil(semestre) {
           <div style="font-family:'Fraunces', serif; font-size:1.1rem; font-weight:600; margin-bottom:6px;">Tu as utilisé tes 5 questions gratuites</div>
           <div style="color:rgba(242,237,228,0.6); font-size:0.88rem;">Abonne-toi pour 500 FCFA/mois et accède à tous les quiz sans limite.</div>
         </div>
-        <button class="btn-ocre" onclick="afficherPaiement()">S'abonner via Wave →</button>
+        <button class="btn-ocre" onclick="afficherPaiement()">S'abonner · Payer 500 FCFA via Wave →</button>
       </div>
     `;
   }
@@ -386,8 +386,10 @@ function afficherPaiement() {
         </div>
 
         <button class="btn-ocre" style="width:100%; padding:16px; font-size:1rem;">
-          Payer 500 FCFA via Wave →
+          S'abonner · Payer 500 FCFA via Wave →
         </button>
+
+        <div style="font-size:0.85rem; color:rgba(242,237,228,0.45); margin-top:12px;">Après paiement, ton compte sera débloqué automatiquement.</div>
 
         <div style="margin-top:16px; font-size:0.78rem; color:rgba(242,237,228,0.3);">
           Paiement sécurisé via Wave Money
@@ -632,7 +634,7 @@ function afficherPaiementPDF(nomMatiere) {
         </div>
 
         <button class="btn-ocre" style="width:100%; padding:16px; font-size:1rem;">
-          Payer 200 FCFA via Wave →
+          Payer 200 FCFA via Wave → Télécharger
         </button>
 
       </div>
