@@ -7729,9 +7729,8 @@ app.post('/api/inscription', async (req, res) => {
   const motDePasseChiffre = await bcrypt.hash(motDePasse, 10);
 
   try {
-    const stmt = db.prepare('INSERT INTO utilisateurs (nom, email, motDePasse) VALUES (?, ?, ?)');
-    const result = stmt.run(nom, email, motDePasseChiffre);
-    res.json({ message: "Compte cree avec succes", id: result.lastInsertRowid });
+    const result = await db.query('INSERT INTO utilisateurs (nom, email, "motDePasse") VALUES ($1, $2, $3) RETURNING id', [nom, email, motDePasseChiffre]);
+    res.json({ message: "Compte cree avec succes", id: result.rows[0].id });
   } catch (err) {
     res.status(400).json({ erreur: "Cet email est deja utilise" });
   }
@@ -7741,87 +7740,96 @@ app.post('/api/inscription', async (req, res) => {
 app.post('/api/connexion', async (req, res) => {
   const { email, motDePasse } = req.body;
 
-  const utilisateur = db.prepare('SELECT * FROM utilisateurs WHERE email = ?').get(email);
+  try {
+    const result = await db.query('SELECT * FROM utilisateurs WHERE email = $1', [email]);
+    const utilisateur = result.rows[0];
 
-  if (!utilisateur) {
-    return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
+    if (!utilisateur) {
+      return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
+    }
+
+    const motDePasseValide = await bcrypt.compare(motDePasse, utilisateur.motDePasse);
+
+    if (!motDePasseValide) {
+      return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
+    }
+
+    const token = jwt.sign(
+      { id: utilisateur.id, nom: utilisateur.nom, aPaye: utilisateur.aPaye },
+      SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      message: "Connexion reussie",
+      token: token,
+      nom: utilisateur.nom,
+      aPaye: utilisateur.aPaye
+    });
+  } catch (err) {
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
-
-  const motDePasseValide = await bcrypt.compare(motDePasse, utilisateur.motDePasse);
-
-  if (!motDePasseValide) {
-    return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
-  }
-
-  const token = jwt.sign(
-    { id: utilisateur.id, nom: utilisateur.nom, aPaye: utilisateur.aPaye },
-    SECRET,
-    { expiresIn: '7d' }
-  );
-
-  res.json({
-    message: "Connexion reussie",
-    token: token,
-    nom: utilisateur.nom,
-    aPaye: utilisateur.aPaye
-  });
 });
 
 // Route sauvegarder score
-app.post('/api/score', (req, res) => {
+app.post('/api/score', async (req, res) => {
   const { token, semestre, matiere, chapitre, note, mention } = req.body;
 
   try {
     const decoded = jwt.verify(token, SECRET);
-    const stmt = db.prepare('INSERT INTO scores (utilisateurId, semestre, matiere, chapitre, note, mention) VALUES (?, ?, ?, ?, ?, ?)');
-    stmt.run(decoded.id, semestre, matiere, chapitre, note, mention);
+    await db.query('INSERT INTO scores ("utilisateurId", semestre, matiere, chapitre, note, mention) VALUES ($1, $2, $3, $4, $5, $6)', [decoded.id, semestre, matiere, chapitre, note, mention]);
     res.json({ message: "Score sauvegarde" });
   } catch (err) {
     res.status(401).json({ erreur: "Non autorise" });
   }
 });
-app.get('/api/classement', (req, res) => {
-  const classement = db.prepare(`
-    SELECT 
-      u.nom,
-      u.id,
-      ROUND(AVG(s.note), 2) as moyenne,
-      COUNT(s.id) as nombreQuiz
-    FROM utilisateurs u
-    JOIN scores s ON s.utilisateurId = u.id
-    GROUP BY u.id
-    HAVING COUNT(s.id) >= 1
-    ORDER BY moyenne DESC
-    LIMIT 10
-  `).all();
-
-  res.json(classement);
+app.get('/api/classement', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        u.nom,
+        u.id,
+        ROUND(AVG(s.note)::numeric, 2) as moyenne,
+        COUNT(s.id) as "nombreQuiz"
+      FROM utilisateurs u
+      JOIN scores s ON s."utilisateurId" = u.id
+      GROUP BY u.id
+      HAVING COUNT(s.id) >= 1
+      ORDER BY moyenne DESC
+      LIMIT 10
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ erreur: "Erreur serveur" });
+  }
 });
 
-app.get('/api/meilleur', (req, res) => {
-  const meilleur = db.prepare(`
-    SELECT 
-      u.nom,
-      u.afficherClassement,
-      ROUND(AVG(s.note), 2) as moyenne,
-      COUNT(s.id) as nombreQuiz
-    FROM utilisateurs u
-    JOIN scores s ON s.utilisateurId = u.id
-    GROUP BY u.id
-    HAVING COUNT(s.id) >= 1
-    ORDER BY moyenne DESC
-    LIMIT 1
-  `).get();
-
-  res.json(meilleur || null);
+app.get('/api/meilleur', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        u.nom,
+        u."afficherClassement",
+        ROUND(AVG(s.note)::numeric, 2) as moyenne,
+        COUNT(s.id) as "nombreQuiz"
+      FROM utilisateurs u
+      JOIN scores s ON s."utilisateurId" = u.id
+      GROUP BY u.id
+      HAVING COUNT(s.id) >= 1
+      ORDER BY moyenne DESC
+      LIMIT 1
+    `);
+    res.json(result.rows[0] || null);
+  } catch (err) {
+    res.status(500).json({ erreur: "Erreur serveur" });
+  }
 });
 
-app.post('/api/classement/visibilite', (req, res) => {
+app.post('/api/classement/visibilite', async (req, res) => {
   const { token, afficher } = req.body;
   try {
     const decoded = jwt.verify(token, SECRET);
-    db.prepare('UPDATE utilisateurs SET afficherClassement = ? WHERE id = ?')
-      .run(afficher ? 1 : 0, decoded.id);
+    await db.query('UPDATE utilisateurs SET "afficherClassement" = $1 WHERE id = $2', [afficher ? 1 : 0, decoded.id]);
     res.json({ message: "Preference mise a jour" });
   } catch(e) {
     res.status(401).json({ erreur: "Non autorise" });
