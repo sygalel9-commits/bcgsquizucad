@@ -3,12 +3,30 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('./database');
+const helmet = require('helmet');
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
+const { body, validationResult } = require('express-validator');
+
 const SECRET = process.env.SECRET_JWT || "bcgs_quiz_secret_2024";
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
+const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS, 10) || 10;
 
+// Security and logging
+app.use(helmet());
+app.use(cors());
+app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.static('public'));
+
+// Rate limiting
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
+app.use(limiter);
+
+// Health check
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 const data = {
   "1er Semestre": [
@@ -7719,45 +7737,58 @@ app.post('/api/corriger', (req, res) => {
   });
 });
 // Route inscription
-app.post('/api/inscription', async (req, res) => {
-  const { nom, email, motDePasse } = req.body;
+app.post('/api/inscription',
+  [
+    body('nom').trim().notEmpty(),
+    body('email').isEmail().normalizeEmail(),
+    body('motDePasse').isLength({ min: 6 })
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ erreur: errors.array() });
 
-  if (!nom || !email || !motDePasse) {
-    return res.status(400).json({ erreur: "Tous les champs sont obligatoires" });
+    const { nom, email, motDePasse } = req.body;
+    const motDePasseChiffre = await bcrypt.hash(motDePasse, SALT_ROUNDS);
+
+    try {
+      const result = await pool.query(
+        'INSERT INTO utilisateurs (nom, email, mot_de_passe) VALUES ($1, $2, $3) RETURNING id',
+        [nom, email, motDePasseChiffre]
+      );
+      res.json({ message: "Compte cree avec succes", id: result.rows[0].id });
+    } catch (err) {
+      res.status(400).json({ erreur: "Cet email est deja utilise" });
+    }
   }
-
-  const motDePasseChiffre = await bcrypt.hash(motDePasse, 10);
-
-  try {
-    const result = await pool.query(
-    'INSERT INTO utilisateurs (nom, email, mot_de_passe) VALUES ($1, $2, $3) RETURNING id',
-    [nom, email, motDePasseChiffre]
-    );
-    res.json({ message: "Compte cree avec succes", id: result.rows[0].id });
-  } catch (err) {
-    res.status(400).json({ erreur: "Cet email est deja utilise" });
-  }
-});
+);
 
 // Route connexion
-app.post('/api/connexion', async (req, res) => {
-  const { email, motDePasse } = req.body;
+app.post('/api/connexion',
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('motDePasse').isLength({ min: 6 })
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ erreur: errors.array() });
 
-  const result = await pool.query(
-    'SELECT * FROM utilisateurs WHERE email = $1',
-    [email]
-  );
-  const utilisateur = result.rows[0];
+    const { email, motDePasse } = req.body;
 
-  if (!utilisateur) {
-    return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
-  }
+    const result = await pool.query(
+      'SELECT * FROM utilisateurs WHERE email = $1',
+      [email]
+    );
+    const utilisateur = result.rows[0];
 
-  const motDePasseValide = await bcrypt.compare(motDePasse, utilisateur.mot_de_passe);
+    if (!utilisateur) {
+      return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
+    }
 
-  if (!motDePasseValide) {
-    return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
-  }
+    const motDePasseValide = await bcrypt.compare(motDePasse, utilisateur.mot_de_passe);
+
+    if (!motDePasseValide) {
+      return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
+    }
 
   const token = jwt.sign(
     { id: utilisateur.id, nom: utilisateur.nom, aPaye: utilisateur.aPaye },
@@ -7774,20 +7805,33 @@ app.post('/api/connexion', async (req, res) => {
 });
 
 // Route sauvegarder score
-app.post('/api/score', async (req, res) => {
-  const { token, semestre, matiere, chapitre, note, mention } = req.body;
+app.post('/api/score',
+  [
+    body('token').notEmpty(),
+    body('semestre').notEmpty(),
+    body('matiere').notEmpty(),
+    body('chapitre').notEmpty(),
+    body('note').isFloat({ min: 0, max: 20 }),
+    body('mention').notEmpty()
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ erreur: errors.array() });
 
-  try {
-    const decoded = jwt.verify(token, SECRET);
-    await pool.query(
-      'INSERT INTO scores (utilisateur_id, semestre, matiere, chapitre, note, mention) VALUES ($1, $2, $3, $4, $5, $6)',
-      [decoded.id, semestre, matiere, chapitre, note, mention]
-    );
-    res.json({ message: "Score sauvegarde" });
-  } catch (err) {
-    res.status(401).json({ erreur: "Non autorise" });
+    const { token, semestre, matiere, chapitre, note, mention } = req.body;
+
+    try {
+      const decoded = jwt.verify(token, SECRET);
+      await pool.query(
+        'INSERT INTO scores (utilisateur_id, semestre, matiere, chapitre, note, mention) VALUES ($1, $2, $3, $4, $5, $6)',
+        [decoded.id, semestre, matiere, chapitre, note, mention]
+      );
+      res.json({ message: "Score sauvegarde" });
+    } catch (err) {
+      res.status(401).json({ erreur: "Non autorise" });
+    }
   }
-});
+);
 app.get('/api/classement', async (req, res) => {
   const result = await pool.query(`
     SELECT 
