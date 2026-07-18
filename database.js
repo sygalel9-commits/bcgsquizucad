@@ -11,31 +11,27 @@ async function initialiserDB() {
       id SERIAL PRIMARY KEY,
       nom TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
-        mot_de_passe TEXT NOT NULL,
-      a_paye BOOLEAN NOT NULL DEFAULT false,
-        afficher_classement INTEGER DEFAULT 1,
-        date_inscription TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      motDePasse TEXT NOT NULL,
+      aPaye INTEGER DEFAULT 0,
+      afficherClassement INTEGER DEFAULT 1,
+      dateInscription TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS scores (
       id SERIAL PRIMARY KEY,
-        utilisateur_id INTEGER NOT NULL,
+      utilisateurId INTEGER NOT NULL,
       semestre TEXT NOT NULL,
       matiere TEXT NOT NULL,
       chapitre TEXT NOT NULL,
       note REAL NOT NULL,
       mention TEXT NOT NULL,
       date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id)
+      FOREIGN KEY (utilisateurId) REFERENCES utilisateurs(id)
     );
   `);
   console.log("Base de donnees PostgreSQL initialisee");
 }
 
-if (process.env.DATABASE_URL) {
-  initialiserDB();
-} else {
-  console.warn('DATABASE_URL non défini — initialisation de la base sautée. Configurez DATABASE_URL en production.');
-}
+initialiserDB();
 
 module.exports = pool;

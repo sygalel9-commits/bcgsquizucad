@@ -426,9 +426,9 @@ async function afficherMatiere(nomMatiere) {
       <div>
         <div style="font-family:'JetBrains Mono', monospace; font-size:0.68rem; color:var(--ocre); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px;">Resume du cours</div>
         <div style="font-family:'Fraunces', serif; font-size:1.2rem; font-weight:600;">Le cours complet en PDF</div>
-        <div style="font-size:0.82rem; color:rgba(242,237,228,0.4); margin-top:4px;">200 FCFA par téléchargement</div>
+        <div style="font-size:0.82rem; color:rgba(242,237,228,0.4); margin-top:4px;">Lecture disponible dans le site</div>
       </div>
-      <button class="btn-ocre" onclick="afficherPaiementPDF('${nomMatiere}')">↓ Télécharger · 200F</button>
+      <button class="btn-ocre" onclick="lirePDF('${nomMatiere}')">📖 Lire le cours</button>
     </div>
 
     <div style="font-family:'JetBrains Mono', monospace; font-size:0.72rem; color:rgba(242,237,228,0.45); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:18px;">Chapitres</div>
@@ -616,28 +616,18 @@ async function afficherResultat() {
   `;
 }
 
-// ========== PAIEMENT PDF ==========
-function afficherPaiementPDF(nomMatiere) {
+
+function lirePDF(nomMatiere) {
   appEl.innerHTML = `
-    <div style="min-height:70vh; display:flex; align-items:center; justify-content:center; padding:40px 24px;">
-      <div style="background:var(--fond-carte); border:1px solid var(--ligne); border-radius:4px; padding:40px; width:100%; max-width:420px; text-align:center;">
-
-        <div class="lien-retour" onclick="afficherMatiere('${nomMatiere}')" style="text-align:left; margin-bottom:24px;">← Retour</div>
-
-        <div style="font-size:2rem; margin-bottom:16px;">📄</div>
-        <div style="font-family:'Fraunces', serif; font-size:1.5rem; font-weight:700; margin-bottom:8px;">Télécharger le PDF</div>
-        <div style="color:rgba(242,237,228,0.5); font-size:0.88rem; margin-bottom:28px;">${nomMatiere}</div>
-
-        <div style="background:var(--fond); border:1px solid var(--ligne); border-radius:4px; padding:20px; margin-bottom:28px;">
-          <div style="font-family:'JetBrains Mono', monospace; font-size:2rem; font-weight:700; color:var(--ocre);">200 FCFA</div>
-          <div style="font-size:0.82rem; color:rgba(242,237,228,0.4); margin-top:4px;">Accès permanent à ce cours</div>
-        </div>
-
-        <button class="btn-ocre" style="width:100%; padding:16px; font-size:1rem;">
-          Payer 200 FCFA via Wave → Télécharger
-        </button>
-
-      </div>
+    ${genererHeader()}
+    <div class="lien-retour" onclick="afficherMatiere('${nomMatiere}')">← Retour</div>
+    <h2 style="font-family:'Fraunces', serif; font-size:1.6rem; font-weight:700; margin:20px 0 24px;">
+      📖 ${nomMatiere}
+    </h2>
+    <div style="background:var(--fond-carte); border:1px solid var(--ligne); border-radius:4px; padding:40px; text-align:center; color:rgba(242,237,228,0.5);">
+      <div style="font-size:2rem; margin-bottom:16px;">📄</div>
+      <div style="font-family:'Fraunces', serif; font-size:1.1rem; margin-bottom:8px;">PDF bientôt disponible</div>
+      <div style="font-size:0.85rem;">Le cours de ${nomMatiere} sera ajouté prochainement.</div>
     </div>
   `;
 }

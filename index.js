@@ -8,25 +8,10 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const { body, validationResult } = require('express-validator');
-
 const SECRET = process.env.SECRET_JWT || "bcgs_quiz_secret_2024";
 const app = express();
 const port = process.env.PORT || 3000;
 const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS, 10) || 10;
-
-// Security and logging
-app.use(helmet());
-app.use(cors());
-app.use(morgan('combined'));
-app.use(express.json());
-app.use(express.static('public'));
-
-// Rate limiting
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
-app.use(limiter);
-
-// Health check
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 const data = {
   "1er Semestre": [
@@ -7737,61 +7722,48 @@ app.post('/api/corriger', (req, res) => {
   });
 });
 // Route inscription
-app.post('/api/inscription',
-  [
-    body('nom').trim().notEmpty(),
-    body('email').isEmail().normalizeEmail(),
-    body('motDePasse').isLength({ min: 6 })
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ erreur: errors.array() });
+app.post('/api/inscription', async (req, res) => {
+  const { nom, email, motDePasse } = req.body;
 
-    const { nom, email, motDePasse } = req.body;
-    const motDePasseChiffre = await bcrypt.hash(motDePasse, SALT_ROUNDS);
-
-    try {
-      const result = await pool.query(
-        'INSERT INTO utilisateurs (nom, email, mot_de_passe) VALUES ($1, $2, $3) RETURNING id',
-        [nom, email, motDePasseChiffre]
-      );
-      res.json({ message: "Compte cree avec succes", id: result.rows[0].id });
-    } catch (err) {
-      res.status(400).json({ erreur: "Cet email est deja utilise" });
-    }
+  if (!nom || !email || !motDePasse) {
+    return res.status(400).json({ erreur: "Tous les champs sont obligatoires" });
   }
-);
+
+  const motDePasseChiffre = await bcrypt.hash(motDePasse, 10);
+
+  try {
+    const result = await pool.query(
+      'INSERT INTO utilisateurs (nom, email, "motDePasse") VALUES ($1, $2, $3) RETURNING id',
+      [nom, email, motDePasseChiffre]
+    );
+    res.json({ message: "Compte cree avec succes", id: result.rows[0].id });
+  } catch (err) {
+    res.status(400).json({ erreur: "Cet email est deja utilise" });
+  }
+});
 
 // Route connexion
-app.post('/api/connexion',
-  [
-    body('email').isEmail().normalizeEmail(),
-    body('motDePasse').isLength({ min: 6 })
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ erreur: errors.array() });
+app.post('/api/connexion', async (req, res) => {
+  const { email, motDePasse } = req.body;
 
-    const { email, motDePasse } = req.body;
+  const result = await pool.query(
+    'SELECT * FROM utilisateurs WHERE email = $1',
+    [email]
+  );
+  const utilisateur = result.rows[0];
 
-    const result = await pool.query(
-      'SELECT * FROM utilisateurs WHERE email = $1',
-      [email]
-    );
-    const utilisateur = result.rows[0];
+  if (!utilisateur) {
+    return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
+  }
 
-    if (!utilisateur) {
-      return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
-    }
+  const motDePasseValide = await bcrypt.compare(motDePasse, utilisateur.motDePasse);
 
-    const motDePasseValide = await bcrypt.compare(motDePasse, utilisateur.mot_de_passe);
-
-    if (!motDePasseValide) {
-      return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
-    }
+  if (!motDePasseValide) {
+    return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
+  }
 
   const token = jwt.sign(
-    { id: utilisateur.id, nom: utilisateur.nom, aPaye: utilisateur.a_paye },
+    { id: utilisateur.id, nom: utilisateur.nom, aPaye: utilisateur.aPaye },
     SECRET,
     { expiresIn: '7d' }
   );
@@ -7800,38 +7772,25 @@ app.post('/api/connexion',
     message: "Connexion reussie",
     token,
     nom: utilisateur.nom,
-    aPaye: utilisateur.a_paye
+    aPaye: utilisateur.aPaye
   });
 });
 
 // Route sauvegarder score
-app.post('/api/score',
-  [
-    body('token').notEmpty(),
-    body('semestre').notEmpty(),
-    body('matiere').notEmpty(),
-    body('chapitre').notEmpty(),
-    body('note').isFloat({ min: 0, max: 20 }),
-    body('mention').notEmpty()
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ erreur: errors.array() });
+app.post('/api/score', async (req, res) => {
+  const { token, semestre, matiere, chapitre, note, mention } = req.body;
 
-    const { token, semestre, matiere, chapitre, note, mention } = req.body;
-
-    try {
-      const decoded = jwt.verify(token, SECRET);
-      await pool.query(
-        'INSERT INTO scores (utilisateur_id, semestre, matiere, chapitre, note, mention) VALUES ($1, $2, $3, $4, $5, $6)',
-        [decoded.id, semestre, matiere, chapitre, note, mention]
-      );
-      res.json({ message: "Score sauvegarde" });
-    } catch (err) {
-      res.status(401).json({ erreur: "Non autorise" });
-    }
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    await pool.query(
+      'INSERT INTO scores ("utilisateurId", semestre, matiere, chapitre, note, mention) VALUES ($1, $2, $3, $4, $5, $6)',
+      [decoded.id, semestre, matiere, chapitre, note, mention]
+    );
+    res.json({ message: "Score sauvegarde" });
+  } catch (err) {
+    res.status(401).json({ erreur: "Non autorise" });
   }
-);
+});
 app.get('/api/classement', async (req, res) => {
   const result = await pool.query(`
     SELECT 
@@ -7840,7 +7799,7 @@ app.get('/api/classement', async (req, res) => {
       ROUND(AVG(s.note)::numeric, 2) as moyenne,
       COUNT(s.id) as "nombreQuiz"
     FROM utilisateurs u
-    JOIN scores s ON s.utilisateur_id = u.id
+    JOIN scores s ON s."utilisateurId" = u.id
     GROUP BY u.id, u.nom
     HAVING COUNT(s.id) >= 1
     ORDER BY moyenne DESC
@@ -7853,12 +7812,12 @@ app.get('/api/meilleur', async (req, res) => {
   const result = await pool.query(`
     SELECT 
       u.nom,
-      u.afficher_classement,
+      u."afficherClassement",
       ROUND(AVG(s.note)::numeric, 2) as moyenne,
       COUNT(s.id) as "nombreQuiz"
     FROM utilisateurs u
-    JOIN scores s ON s.utilisateur_id = u.id
-    GROUP BY u.id, u.nom, u.afficher_classement
+    JOIN scores s ON s."utilisateurId" = u.id
+    GROUP BY u.id, u.nom, u."afficherClassement"
     HAVING COUNT(s.id) >= 1
     ORDER BY moyenne DESC
     LIMIT 1
@@ -7871,7 +7830,7 @@ app.post('/api/classement/visibilite', async (req, res) => {
   try {
     const decoded = jwt.verify(token, SECRET);
     await pool.query(
-      'UPDATE utilisateurs SET afficher_classement = $1 WHERE id = $2',
+      'UPDATE utilisateurs SET "afficherClassement" = $1 WHERE id = $2',
       [afficher ? 1 : 0, decoded.id]
     );
     res.json({ message: "Preference mise a jour" });
