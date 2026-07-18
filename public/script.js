@@ -311,11 +311,41 @@ async function afficherPageAccueil(semestre) {
   if (semestre) semestreActuel = semestre;
   appEl.innerHTML = "<p>Chargement...</p>";
 
-  const reponse = await fetch('/api/matieres/' + encodeURIComponent(semestreActuel));
+  const [reponse, reponseMeilleur] = await Promise.all([
+    fetch('/api/matieres/' + encodeURIComponent(semestreActuel)),
+    fetch('/api/meilleur')
+  ]);
+
   const matieres = await reponse.json();
+  const meilleur = await reponseMeilleur.json();
   window.matieresActuelles = matieres;
 
   let html = genererHeader();
+
+  // Bandeau meilleur joueur
+  if (meilleur && meilleur.afficherClassement) {
+    html += `
+      <div style="background:linear-gradient(135deg, rgba(212,165,116,0.15), rgba(95,168,143,0.1)); border:1px solid rgba(212,165,116,0.3); border-radius:4px; padding:16px 22px; margin-bottom:32px; display:flex; align-items:center; gap:16px;">
+        <div style="font-size:1.8rem;">🏆</div>
+        <div>
+          <div style="font-family:'JetBrains Mono', monospace; font-size:0.65rem; color:var(--ocre); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">Meilleur joueur du moment</div>
+          <div style="font-family:'Fraunces', serif; font-size:1.1rem; font-weight:600;">${meilleur.nom} <span style="color:var(--ocre);">${meilleur.moyenne}/20</span></div>
+          <div style="font-size:0.78rem; color:rgba(242,237,228,0.45); margin-top:2px;">${meilleur.nombreQuiz} quiz completés</div>
+        </div>
+        <button onclick="afficherClassement()" style="margin-left:auto; font-family:'JetBrains Mono', monospace; font-size:0.68rem; background:transparent; border:1px solid var(--ligne); color:rgba(242,237,228,0.6); padding:8px 14px; border-radius:4px; cursor:pointer; text-transform:uppercase; white-space:nowrap;">
+          Voir classement
+        </button>
+      </div>
+    `;
+  } else {
+    html += `
+      <div style="margin-bottom:32px;">
+        <button onclick="afficherClassement()" style="font-family:'JetBrains Mono', monospace; font-size:0.68rem; background:transparent; border:1px solid var(--ligne); color:rgba(242,237,228,0.6); padding:10px 18px; border-radius:4px; cursor:pointer; text-transform:uppercase; letter-spacing:0.04em;">
+          🏆 Voir le classement
+        </button>
+      </div>
+    `;
+  }
 
   html += `
     <h1 class="hero-titre">Révise tes cours comme <em>un vrai cahier de labo.</em></h1>
@@ -334,7 +364,7 @@ async function afficherPageAccueil(semestre) {
           <div style="font-family:'Fraunces', serif; font-size:1.1rem; font-weight:600; margin-bottom:6px;">Tu as utilisé tes 5 questions gratuites</div>
           <div style="color:rgba(242,237,228,0.6); font-size:0.88rem;">Abonne-toi pour 500 FCFA/mois et accède à tous les quiz sans limite.</div>
         </div>
-        <button class="btn-ocre" onclick="afficherPaiement()">S'abonner · Payer 500 FCFA via Wave →</button>
+        <button class="btn-ocre" onclick="afficherPaiement()">S'abonner via Wave →</button>
       </div>
     `;
   }
@@ -359,6 +389,90 @@ async function afficherPageAccueil(semestre) {
 
   html += `</div>`;
   appEl.innerHTML = html;
+}
+async function afficherClassement() {
+  appEl.innerHTML = "<p>Chargement...</p>";
+
+  const reponse = await fetch('/api/classement');
+  const classement = await reponse.json();
+
+  // Verifier si l'utilisateur connecte est dans le classement
+  const monRang = classement.findIndex(j => j.id === utilisateurConnecte.id);
+
+  let html = `
+    ${genererHeader()}
+    <div class="lien-retour" onclick="afficherPageAccueil()">← Retour</div>
+
+    <h2 class="hero-titre" style="font-size:2rem; margin-bottom:6px;">🏆 Classement général</h2>
+    <p class="hero-sous" style="margin-bottom:32px;">Les meilleurs joueurs par moyenne générale</p>
+  `;
+
+  if (classement.length === 0) {
+    html += `<p style="color:rgba(242,237,228,0.5);">Aucun joueur classé pour l'instant. Joue des quiz pour apparaître ici !</p>`;
+  } else {
+    html += `<div style="max-width:600px;">`;
+
+    classement.forEach((joueur, index) => {
+      const estMoi = joueur.id === utilisateurConnecte.id;
+      const medals = ['🥇', '🥈', '🥉'];
+      const medal = medals[index] || `${index + 1}.`;
+
+      html += `
+        <div style="background:${estMoi ? 'rgba(212,165,116,0.12)' : 'var(--fond-carte)'}; border:1px solid ${estMoi ? 'var(--ocre)' : 'var(--ligne)'}; border-radius:4px; padding:16px 20px; margin-bottom:10px; display:flex; align-items:center; gap:16px;">
+          <div style="font-size:1.4rem; width:32px; text-align:center;">${medal}</div>
+          <div style="flex:1;">
+            <div style="font-family:'Fraunces', serif; font-size:1rem; font-weight:600;">
+              ${joueur.nom} ${estMoi ? '<span style="font-family:Inter; font-size:0.72rem; color:var(--ocre);">(toi)</span>' : ''}
+            </div>
+            <div style="font-size:0.78rem; color:rgba(242,237,228,0.45); margin-top:2px;">${joueur.nombreQuiz} quiz complétés</div>
+          </div>
+          <div style="font-family:'JetBrains Mono', monospace; font-weight:700; color:var(--ocre); font-size:1.1rem;">
+            ${joueur.moyenne}/20
+          </div>
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+
+    // Option visibilite pour le meilleur joueur
+    if (monRang === 0) {
+      const visible = true;
+      html += `
+        <div style="margin-top:28px; background:var(--fond-carte); border:1px solid var(--ligne); border-radius:4px; padding:20px 24px; max-width:600px;">
+          <div style="font-family:'Fraunces', serif; font-size:1rem; font-weight:600; margin-bottom:8px;">Tu es le meilleur joueur 🎉</div>
+          <div style="font-size:0.85rem; color:rgba(242,237,228,0.6); margin-bottom:16px;">Veux-tu que ton nom apparaisse sur la page d'accueil pour tous les utilisateurs ?</div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-ocre" onclick="changerVisibilite(true)" style="padding:10px 20px; font-size:0.85rem;">✓ Oui, afficher mon nom</button>
+            <button class="btn-contour" onclick="changerVisibilite(false)" style="padding:10px 20px; font-size:0.85rem;">Non, rester discret</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  appEl.innerHTML = html;
+}
+
+async function changerVisibilite(afficher) {
+  await fetch('/api/classement/visibilite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: utilisateurConnecte.token, afficher })
+  });
+
+  const message = afficher
+    ? "Ton nom apparaîtra sur la page d'accueil !"
+    : "Tu resteras discret dans le classement.";
+
+  appEl.innerHTML = `
+    ${genererHeader()}
+    <div style="text-align:center; padding:60px 24px;">
+      <div style="font-size:2rem; margin-bottom:16px;">${afficher ? '🌟' : '👌'}</div>
+      <div style="font-family:'Fraunces', serif; font-size:1.4rem; font-weight:600; margin-bottom:12px;">${message}</div>
+      <button class="btn-ocre" onclick="afficherPageAccueil()" style="margin-top:20px;">Retour à l'accueil</button>
+    </div>
+  `;
 }
 
 // ========== PAGE PAIEMENT WAVE ==========
