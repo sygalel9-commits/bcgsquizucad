@@ -2,17 +2,16 @@ require('dotenv').config();
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const pool = require('./database');
-const helmet = require('helmet');
-const cors = require('cors');
-const rateLimit = require('express-rate-limit');
-const morgan = require('morgan');
-const { body, validationResult } = require('express-validator');
-const SECRET = process.env.SECRET_JWT || "bcgs_quiz_secret_2024";
-const app = express();
-const port = process.env.PORT || 3000;
-const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS, 10) || 10;
+const db = require('./database');
 
+const app = express();
+const port = 3000;
+const SECRET = process.env.SECRET_JWT || "bcgs_quiz_secret_2024";
+
+app.use(express.json());
+app.use(express.static('public'));
+
+// ========== DONNEES==========
 const data = {
   "1er Semestre": [
     {
@@ -7655,8 +7654,9 @@ const data = {
       ]
     }
   ]
-};
+}
 
+// ========== ROUTES QUIZ ==========
 app.get('/api/semestres', (req, res) => {
   res.json(Object.keys(data));
 });
@@ -7681,6 +7681,7 @@ app.get('/api/sousmatieres/:semestre/:matiere', (req, res) => {
   }
   res.json(matiereTrouvee.sousMatieres);
 });
+
 app.post('/api/corriger', (req, res) => {
   const { reponsesUtilisateur, quiz } = req.body;
 
@@ -7689,10 +7690,19 @@ app.post('/api/corriger', (req, res) => {
   }
 
   let bonnesReponses = 0;
-
   quiz.forEach((question, index) => {
-    if (reponsesUtilisateur[index] === question.answer) {
-      bonnesReponses++;
+    if (Array.isArray(question.answer)) {
+      const reponsesTriees = reponsesUtilisateur[index]
+        ? reponsesUtilisateur[index].split(' | ').sort()
+        : [];
+      const bonnesTriees = [...question.answer].sort();
+      if (JSON.stringify(reponsesTriees) === JSON.stringify(bonnesTriees)) {
+        bonnesReponses++;
+      }
+    } else {
+      if (reponsesUtilisateur[index] === question.answer) {
+        bonnesReponses++;
+      }
     }
   });
 
@@ -7713,131 +7723,210 @@ app.post('/api/corriger', (req, res) => {
     mention = "Peut mieux faire";
   }
 
-  res.json({
-    bonnesReponses: bonnesReponses,
-    totalQuestions: quiz.length,
-    note: noteArrondie,
-    mention: mention,
-    celebration: celebration
-  });
+  res.json({ bonnesReponses, totalQuestions: quiz.length, note: noteArrondie, mention, celebration });
 });
-// Route inscription
+
+// ========== ROUTES AUTHENTIFICATION ==========
 app.post('/api/inscription', async (req, res) => {
   const { nom, email, motDePasse } = req.body;
 
   if (!nom || !email || !motDePasse) {
     return res.status(400).json({ erreur: "Tous les champs sont obligatoires" });
   }
+  if (motDePasse.length < 6) {
+    return res.status(400).json({ erreur: "Mot de passe trop court (minimum 6 caracteres)" });
+  }
 
   const motDePasseChiffre = await bcrypt.hash(motDePasse, 10);
 
   try {
-    const result = await pool.query(
-      'INSERT INTO utilisateurs (nom, email, "motDePasse") VALUES ($1, $2, $3) RETURNING id',
-      [nom, email, motDePasseChiffre]
-    );
-    res.json({ message: "Compte cree avec succes", id: result.rows[0].id });
+    if (process.env.DATABASE_URL) {
+      const result = await db.query(
+        'INSERT INTO utilisateurs (nom, email, mot_de_passe) VALUES ($1, $2, $3) RETURNING id',
+        [nom, email, motDePasseChiffre]
+      );
+      res.json({ message: "Compte cree avec succes", id: result.rows[0].id });
+    } else {
+      const stmt = db.prepare('INSERT INTO utilisateurs (nom, email, mot_de_passe) VALUES (?, ?, ?)');
+      const result = stmt.run(nom, email, motDePasseChiffre);
+      res.json({ message: "Compte cree avec succes", id: result.lastInsertRowid });
+    }
   } catch (err) {
     res.status(400).json({ erreur: "Cet email est deja utilise" });
   }
 });
 
-// Route connexion
 app.post('/api/connexion', async (req, res) => {
   const { email, motDePasse } = req.body;
 
-  const result = await pool.query(
-    'SELECT * FROM utilisateurs WHERE email = $1',
-    [email]
-  );
-  const utilisateur = result.rows[0];
+  try {
+    let utilisateur;
 
-  if (!utilisateur) {
-    return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
+    if (process.env.DATABASE_URL) {
+      const result = await db.query(
+        'SELECT * FROM utilisateurs WHERE email = $1',
+        [email]
+      );
+      utilisateur = result.rows[0];
+    } else {
+      utilisateur = db.prepare('SELECT * FROM utilisateurs WHERE email = ?').get(email);
+    }
+
+    if (!utilisateur) {
+      return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
+    }
+
+    const motDePasseValide = await bcrypt.compare(motDePasse, utilisateur.mot_de_passe);
+
+    if (!motDePasseValide) {
+      return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
+    }
+
+    const token = jwt.sign(
+      { id: utilisateur.id, nom: utilisateur.nom, a_paye: utilisateur.a_paye },
+      SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      message: "Connexion reussie",
+      token,
+      nom: utilisateur.nom,
+      a_paye: utilisateur.a_paye
+    });
+
+  } catch (err) {
+    res.status(500).json({ erreur: "Erreur serveur" });
   }
-
-  const motDePasseValide = await bcrypt.compare(motDePasse, utilisateur.motDePasse);
-
-  if (!motDePasseValide) {
-    return res.status(401).json({ erreur: "Email ou mot de passe incorrect" });
-  }
-
-  const token = jwt.sign(
-    { id: utilisateur.id, nom: utilisateur.nom, aPaye: utilisateur.aPaye },
-    SECRET,
-    { expiresIn: '7d' }
-  );
-
-  res.json({
-    message: "Connexion reussie",
-    token,
-    nom: utilisateur.nom,
-    aPaye: utilisateur.aPaye
-  });
 });
 
-// Route sauvegarder score
 app.post('/api/score', async (req, res) => {
   const { token, semestre, matiere, chapitre, note, mention } = req.body;
 
   try {
     const decoded = jwt.verify(token, SECRET);
-    await pool.query(
-      'INSERT INTO scores ("utilisateurId", semestre, matiere, chapitre, note, mention) VALUES ($1, $2, $3, $4, $5, $6)',
-      [decoded.id, semestre, matiere, chapitre, note, mention]
-    );
+
+    if (process.env.DATABASE_URL) {
+      await db.query(
+        'INSERT INTO scores (utilisateur_id, semestre, matiere, chapitre, note, mention) VALUES ($1, $2, $3, $4, $5, $6)',
+        [decoded.id, semestre, matiere, chapitre, note, mention]
+      );
+    } else {
+      db.prepare('INSERT INTO scores (utilisateur_id, semestre, matiere, chapitre, note, mention) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(decoded.id, semestre, matiere, chapitre, note, mention);
+    }
+
     res.json({ message: "Score sauvegarde" });
   } catch (err) {
     res.status(401).json({ erreur: "Non autorise" });
   }
 });
+
+// ========== ROUTES CLASSEMENT ==========
 app.get('/api/classement', async (req, res) => {
-  const result = await pool.query(`
-    SELECT 
-      u.nom,
-      u.id,
-      ROUND(AVG(s.note)::numeric, 2) as moyenne,
-      COUNT(s.id) as "nombreQuiz"
-    FROM utilisateurs u
-    JOIN scores s ON s."utilisateurId" = u.id
-    GROUP BY u.id, u.nom
-    HAVING COUNT(s.id) >= 1
-    ORDER BY moyenne DESC
-    LIMIT 10
-  `);
-  res.json(result.rows);
+  try {
+    let rows;
+
+    if (process.env.DATABASE_URL) {
+      const result = await db.query(`
+        SELECT
+          u.nom,
+          u.id,
+          ROUND(AVG(s.note)::numeric, 2) as moyenne,
+          COUNT(s.id) as nombre_quiz
+        FROM utilisateurs u
+        JOIN scores s ON s.utilisateur_id = u.id
+        GROUP BY u.id, u.nom
+        HAVING COUNT(s.id) >= 1
+        ORDER BY moyenne DESC
+        LIMIT 10
+      `);
+      rows = result.rows;
+    } else {
+      rows = db.prepare(`
+        SELECT
+          u.nom,
+          u.id,
+          ROUND(AVG(s.note), 2) as moyenne,
+          COUNT(s.id) as nombre_quiz
+        FROM utilisateurs u
+        JOIN scores s ON s.utilisateur_id = u.id
+        GROUP BY u.id
+        HAVING COUNT(s.id) >= 1
+        ORDER BY moyenne DESC
+        LIMIT 10
+      `).all();
+    }
+
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ erreur: "Erreur serveur" });
+  }
 });
 
 app.get('/api/meilleur', async (req, res) => {
-  const result = await pool.query(`
-    SELECT 
-      u.nom,
-      u."afficherClassement",
-      ROUND(AVG(s.note)::numeric, 2) as moyenne,
-      COUNT(s.id) as "nombreQuiz"
-    FROM utilisateurs u
-    JOIN scores s ON s."utilisateurId" = u.id
-    GROUP BY u.id, u.nom, u."afficherClassement"
-    HAVING COUNT(s.id) >= 1
-    ORDER BY moyenne DESC
-    LIMIT 1
-  `);
-  res.json(result.rows[0] || null);
+  try {
+    let meilleur;
+
+    if (process.env.DATABASE_URL) {
+      const result = await db.query(`
+        SELECT
+          u.nom,
+          u.afficher_classement,
+          ROUND(AVG(s.note)::numeric, 2) as moyenne,
+          COUNT(s.id) as nombre_quiz
+        FROM utilisateurs u
+        JOIN scores s ON s.utilisateur_id = u.id
+        GROUP BY u.id, u.nom, u.afficher_classement
+        HAVING COUNT(s.id) >= 1
+        ORDER BY moyenne DESC
+        LIMIT 1
+      `);
+      meilleur = result.rows[0];
+    } else {
+      meilleur = db.prepare(`
+        SELECT
+          u.nom,
+          u.afficher_classement,
+          ROUND(AVG(s.note), 2) as moyenne,
+          COUNT(s.id) as nombre_quiz
+        FROM utilisateurs u
+        JOIN scores s ON s.utilisateur_id = u.id
+        GROUP BY u.id
+        HAVING COUNT(s.id) >= 1
+        ORDER BY moyenne DESC
+        LIMIT 1
+      `).get();
+    }
+
+    res.json(meilleur || null);
+  } catch (err) {
+    res.status(500).json({ erreur: "Erreur serveur" });
+  }
 });
 
 app.post('/api/classement/visibilite', async (req, res) => {
   const { token, afficher } = req.body;
   try {
     const decoded = jwt.verify(token, SECRET);
-    await pool.query(
-      'UPDATE utilisateurs SET "afficherClassement" = $1 WHERE id = $2',
-      [afficher ? 1 : 0, decoded.id]
-    );
+
+    if (process.env.DATABASE_URL) {
+      await db.query(
+        'UPDATE utilisateurs SET afficher_classement = $1 WHERE id = $2',
+        [afficher ? 1 : 0, decoded.id]
+      );
+    } else {
+      db.prepare('UPDATE utilisateurs SET afficher_classement = ? WHERE id = ?')
+        .run(afficher ? 1 : 0, decoded.id);
+    }
+
     res.json({ message: "Preference mise a jour" });
   } catch(e) {
     res.status(401).json({ erreur: "Non autorise" });
   }
 });
+
+// ========== DEMARRAGE ==========
 app.listen(process.env.PORT || port, () => {
-  console.log("Serveur demarre sur http://localhost:" + port);
+  console.log("Serveur demarre sur http://localhost:" + (process.env.PORT || port));
 });

@@ -43,11 +43,11 @@ function init() {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       utilisateurConnecte = {
-        token,
-        nom: payload.nom,
-        id: payload.id,
-        aPaye: normalizeBool(payload.aPaye)
-      };
+  token,
+  nom: payload.nom,
+  id: payload.id,
+  a_paye: payload.a_paye
+};
       questionsJouees = parseInt(localStorage.getItem('questionsJouees') || '0');
       afficherPageAccueil();
     } catch(e) {
@@ -269,10 +269,10 @@ async function connecterAvec(email, mdp, erreurEl) {
   localStorage.setItem('token', data.token);
   localStorage.setItem('questionsJouees', '0');
   utilisateurConnecte = {
-    token: data.token,
-    nom: data.nom,
-    aPaye: normalizeBool(data.aPaye)
-  };
+  token: data.token,
+  nom: data.nom,
+  a_paye: data.a_paye
+};
   questionsJouees = 0;
 
   afficherPageAccueil();
@@ -357,7 +357,7 @@ async function afficherPageAccueil(semestre) {
     </div>
   `;
 
-  if (!utilisateurConnecte.aPaye && questionsJouees >= MAX_QUESTIONS_GRATUITES) {
+  if (!utilisateurConnecte.a_Paye && questionsJouees >= MAX_QUESTIONS_GRATUITES) {
     html += `
       <div style="background:rgba(212,165,116,0.1); border:1px solid var(--ocre); border-radius:4px; padding:24px 28px; margin-bottom:40px; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;">
         <div>
@@ -375,7 +375,7 @@ async function afficherPageAccueil(semestre) {
     const icone = icones[matiere.nom] || "📚";
     const couleur = couleurs[matiere.nom] || "#5FA88F";
     const nbChapitres = matiere.sousMatieres.length;
-    const bloque = !utilisateurConnecte.aPaye && questionsJouees >= MAX_QUESTIONS_GRATUITES;
+    const bloque = !utilisateurConnecte.a_Paye && questionsJouees >= MAX_QUESTIONS_GRATUITES;
 
     html += `
       <div class="carte-matiere" style="--accent:${couleur}; ${bloque ? 'opacity:0.5;' : ''}" onclick="${bloque ? 'afficherPaiement()' : `selectionnerMatiere(${index})`}">
