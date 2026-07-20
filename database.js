@@ -1,37 +1,40 @@
-const { Pool } = require('pg');
+let db;
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
-});
-
-async function initialiserDB() {
-  await pool.query(`
+if (process.env.DATABASE_URL) {
+  // En ligne (Render) : utilise PostgreSQL
+  const { Pool } = require('pg');
+  db = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+  console.log("Connexion PostgreSQL");
+} else {
+  // En local : utilise SQLite
+  const Database = require('better-sqlite3');
+  db = new Database('bcgs.db');
+  db.exec(`
     CREATE TABLE IF NOT EXISTS utilisateurs (
-      id SERIAL PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       nom TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       motDePasse TEXT NOT NULL,
       aPaye INTEGER DEFAULT 0,
       afficherClassement INTEGER DEFAULT 1,
-      dateInscription TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      dateInscription TEXT DEFAULT CURRENT_TIMESTAMP
     );
-
     CREATE TABLE IF NOT EXISTS scores (
-      id SERIAL PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       utilisateurId INTEGER NOT NULL,
       semestre TEXT NOT NULL,
       matiere TEXT NOT NULL,
       chapitre TEXT NOT NULL,
       note REAL NOT NULL,
       mention TEXT NOT NULL,
-      date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      date TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (utilisateurId) REFERENCES utilisateurs(id)
     );
   `);
-  console.log("Base de donnees PostgreSQL initialisee");
+  console.log("Connexion SQLite locale");
 }
 
-initialiserDB();
-
-module.exports = pool;
+module.exports = db;

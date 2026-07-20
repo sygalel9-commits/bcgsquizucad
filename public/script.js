@@ -496,7 +496,6 @@ function afficherPaiement() {
           <div style="font-size:0.88rem; color:rgba(242,237,228,0.7); margin-bottom:10px;">✓ Quiz illimités sur toutes les matières</div>
           <div style="font-size:0.88rem; color:rgba(242,237,228,0.7); margin-bottom:10px;">✓ Explications détaillées à chaque question</div>
           <div style="font-size:0.88rem; color:rgba(242,237,228,0.7); margin-bottom:10px;">✓ Suivi de tes scores et progressions</div>
-          <div style="font-size:0.88rem; color:rgba(242,237,228,0.4);">✗ Téléchargement PDF (200 FCFA/PDF)</div>
         </div>
 
         <button class="btn-ocre" style="width:100%; padding:16px; font-size:1rem;">
